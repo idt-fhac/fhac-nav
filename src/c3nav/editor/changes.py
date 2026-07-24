@@ -375,8 +375,16 @@ class ChangedObjectCollection(BaseSchema):
                                 id=value,
                             )))
                     if field.unique:
+                        # Only LocationSlug-owned fields (e.g. slug) share the parent table.
+                        # Unique fields on concrete subclasses (e.g. Level.short_label) must
+                        # be checked against that subclass, or editor changeset loading 500s.
+                        unique_model = (
+                            "locationslug"
+                            if issubclass(model, LocationSlug) and field.model is LocationSlug
+                            else model._meta.model_name
+                        )
                         dependencies.add(OperationDependencyUniqueValue(
-                            model="locationslug" if issubclass(model, LocationSlug) else model._meta.model_name,
+                            model=unique_model,
                             field=field_name,
                             value=value,
                         ))
