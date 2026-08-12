@@ -200,7 +200,7 @@ class Locator:
                     )).intersection(real_space))
                     if coord in segment.coords
                 ))
-            except StopIteration, AttributeError:
+            except (StopIteration, AttributeError):
                 coords.append((coord, None))
             else:
                 ray_end_coord = next(iter(c for c in ray.coords if c != coord))
