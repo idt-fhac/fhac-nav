@@ -25,7 +25,7 @@ class Command(BaseCommand):
         not_found = values - set(level.level_index for level in levels)
         if not_found:
             raise argparse.ArgumentTypeError(
-                ngettext_lazy('Unknown level: %s', 'Unknown levels: %s', len(not_found)) % ', '.join(not_found)
+                ngettext('Unknown level: %s', 'Unknown levels: %s', len(not_found)) % ', '.join(not_found)
             )
 
         return levels
