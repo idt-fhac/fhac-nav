@@ -41,6 +41,10 @@
     {% trans 'Edit' as edit_caption %}
 {% endif %}
 
+<p>
+    <a href="{{ back_url }}" data-no-next-zoom>&laquo; {{ back_title }}</a>
+</p>
+
 {% if bulk_actions %}
     <form method="post" action="{{ request.path }}">
     {% csrf_token %}
@@ -56,13 +60,6 @@
                 </tr>
             {% endif %}
             {% for item in objects.objects %}
-                {% if forloop.counter0|divisibleby:10 %}
-                    <tr>
-                        <td><a href="{{ back_url }}" data-no-next-zoom>&laquo; {{ back_title }}</a></td>
-                        {% for col in add_cols %}<td></td>{% endfor %}
-                        <td></td>
-                    </tr>
-                {% endif %}
                 <tr data-pk="{{ item.pk }}">
                     <td>
                         {% if bulk_actions %}<label for="bulk_actions_{{ item.pk }}">{% endif %}
@@ -80,11 +77,6 @@
                 </tr>
             {% endfor %}
         {% endfor %}
-        <tr>
-            <td><a href="{{ back_url }}" data-no-next-zoom>&laquo; {{ back_title }}</a></td>
-            {% for col in add_cols %}<td></td>{% endfor %}
-            <td></td>
-        </tr>
     </tbody>
 </table>
 {% if bulk_actions %}

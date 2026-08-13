@@ -23,23 +23,17 @@
 
 {% trans 'Edit' as edit_caption %}
 
+<p>
+    <a href="{{ back_url }}" data-no-next-zoom>&laquo; {{ back_title }}</a>
+</p>
+
 <table class="table table-condensed itemtable" data-nozoom data-list="dataoverlayfeature" data-overlay-id="{{ overlay_id }}">
     <tbody>
         {% for feature in features %}
-            {% if forloop.counter0|divisibleby:10 %}
-                <tr>
-                    <td><a href="{{ back_url }}" data-no-next-zoom>&laquo; {{ back_title }}</a></td>
-                <td></td>
-                </tr>
-            {% endif %}
             <tr data-pk="{{ feature.pk }}">
                 <td>{{ feature.title }}</td>
                 <td><a href="{{ feature.edit_url }}">{{ edit_caption }}</a></td>
             </tr>
         {% endfor %}
-        <tr>
-            <td><a href="{{ back_url }}" data-no-next-zoom>&laquo; {{ back_title }}</a></td>
-            <td></td>
-        </tr>
     </tbody>
 </table>
