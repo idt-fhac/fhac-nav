@@ -78,7 +78,7 @@ python3 manage.py compilemessages
 
 ### Build the map
 
-**No documentation is available for this. We're working on it. Please stop mistaking documentation from years ago for something that is still up to date.**
+See [mapping.md](mapping.md) for what a map is made of and in which order to build it.
 
 ### Run a development server
 
