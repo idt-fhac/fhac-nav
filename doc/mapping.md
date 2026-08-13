@@ -114,9 +114,7 @@ accessible area — that log is the only feedback you get, so read it.
 Create these before drawing content, so you can tag objects as you draw them instead of revisiting
 hundreds of them later.
 
-**Way types** for everything that isn't level walking. Each carries `speed`, `speed_up`,
-`extra_seconds`, an icon, and `avoid_by_default` — that last flag is what a barrier-free routing option
-actually switches on. A typical set: `stairs`, `escalator`, `elevator`, `freight elevator`.
+**Way types** for everything that isn't level walking — see the section below.
 
 **Location group categories**, then groups within them. Categories decide what a group can be attached to
 (`allow_levels`, `allow_spaces`, `allow_areas`, `allow_pois`) and whether an object may have only one group
@@ -140,6 +138,46 @@ the map becomes unreadable when there are more than a few dozen. Make a handful 
 "few things, large, visible when zoomed out" to "many things, small, only when zoomed right in", and attach
 them to location groups.
 
+#### Way types in detail
+
+A graph edge with no way type is plain walking: 1 m/s, no extra time, scaled by the user's walk speed
+preference. You only create a `WayType` for the exceptions.
+
+| Field | What it does |
+| --- | --- |
+| `speed` | m/s for edges going down or staying level (`rise <= 0`) |
+| `speed_up` | m/s for edges going up (`rise > 0`); the router splits edges by direction |
+| `extra_seconds` | added **per edge**, on top of distance ÷ speed — waiting time |
+| `walk` | if set, the user's walk speed choice scales it (slow 0.8 / default 1 / fast 1.2) |
+| `avoid_by_default` | the *initial* value of this way type's routing option, `avoid` instead of `allow` |
+| `up_separate` | routing options become "avoid upwards / avoid downwards / avoid completely" |
+| `join_edges` | consecutive edges of the same type become one instruction instead of one per edge |
+| `description`, `description_up` | the wording of that instruction, downwards/general and upwards |
+| `level_change_description` | inserted at a level change; `{level}` is replaced by the level title |
+| `title_plural` | the label of this way type in the routing options form |
+| `color`, `icon_name` | edge color in the graph editor, icon in the route description |
+
+A set that covers an ordinary building — the values are a starting point, not gospel:
+
+| | `speed` | `speed_up` | `extra_seconds` | `walk` | `up_separate` | `avoid_by_default` |
+| --- | --- | --- | --- | --- | --- | --- |
+| stairs | 0.7 | 0.5 | 0 | yes | yes | no |
+| escalator | 0.75 | 0.75 | 5 | no | yes | no |
+| elevator | 1.0 | 1.0 | 35 | no | no | no |
+| freight elevator | 1.0 | 1.0 | 60 | no | no | yes |
+
+`walk` is off for escalators and lifts because walking faster does not make a lift arrive sooner. The
+lift's extra seconds are call, wait and doors — that number is what makes the router prefer stairs for one
+floor and the lift for three, so it is worth tuning against a real building.
+
+Two things that are easy to get wrong:
+
+- `avoid_by_default` is **not** how barrier-free routing works. That happens when the *user* sets stairs
+  and escalators to "avoid" in the routing options. Setting it on stairs routes everybody through the lifts.
+  Use it for ways the general public should not be offered at all: freight lifts, staff routes.
+- One-way is a property of the **edge**, not of the way type. An escalator is one-way because you ticked
+  *create one way edges* when connecting its two nodes.
+
 ### 7. Lifts
 
 A lift is *not* an intermediate level. Draw a small `Space` for the car on **every** level it serves, tag
@@ -151,9 +189,27 @@ a walkable slope.
 
 Nothing routes until this exists — not searching, not "route from A to B". The graph is drawn by hand.
 
-- **Inside a space**: `/editor/spaces/<id>/graph/` lets you click to place `GraphNode`s. Place them along
-  the line people actually walk, and connect consecutive ones. A corridor needs a chain of nodes; a small
-  room needs one.
+**Where a node goes.** An edge is a straight line between two nodes, and the router walks that line
+literally, so nodes exist wherever the walking line bends or branches:
+
+- one in every space, always — this is the rule with no exceptions. A space with no node at all cannot be
+  reached, and the router's own fallback (a temporary node at a representative point of an unnoded area)
+  only kicks in for spaces that already have at least one node.
+- at every junction and at every doorway
+- along corridors, often enough that the straight line between consecutive nodes stays inside the walkable
+  area — a node every few metres in a straight run, one at each bend
+- at the foot and the head of every staircase, and in every lift car
+- a small room needs exactly one; a lecture hall with two doors needs one per door plus one in the middle
+
+Nodes must sit inside the walkable area. One outside any altitude area still works but is logged as a
+warning during `processupdates` and gets an approximated height — check that log after your first pass.
+
+**Where an edge goes.** Connect consecutive nodes so that the straight segment between them does not cross
+a wall, a column or an obstacle. This is exactly the test the router applies to its own fallback edges, and
+it is the one mistake that produces routes walking diagonally through walls.
+
+- **Inside a space**: `/editor/spaces/<id>/graph/` lets you click to place `GraphNode`s, then connect them
+  by selecting one and clicking the next.
 - **Through doors**: the door's edit page offers every pair of nodes on either side of it as a single list,
   which is much faster than connecting them one by one.
 - **Between levels**: open the level graph at `/editor/levels/<id>/graph/`, select a node, switch to the
