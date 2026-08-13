@@ -2,7 +2,7 @@
 
 <ul class="nav navbar-nav navbar-right">
     <li><a href="{% url 'site.index' %}">
-        &laquo; {% trans 'back to c3nav' %}
+        &laquo; {% if branding and branding != 'c3nav' %}{% blocktrans with branding=branding %}back to {{ branding }}{% endblocktrans %}{% else %}{% trans 'back to c3nav' %}{% endif %}
     </a></li>
     <li><a href="{{ request.changeset.get_absolute_url }}">
         {% if request.changeset.direct_editing %}
