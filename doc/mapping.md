@@ -46,6 +46,39 @@ part of the wall. A glazed opening you can walk through is a `Door`; a glass par
 around is an `Obstacle`.
 
 
+## Working in the editor
+
+### Changesets
+
+Every change belongs to a changeset, and you have at most one active at a time — editing without an active
+one creates it for you. Changesets move through a small state machine:
+
+| State | Meaning | Changes editable |
+| --- | --- | --- |
+| `unproposed` | yours, not submitted yet | yes |
+| `proposed`, `reproposed` | submitted, waiting for a reviewer | no |
+| `review` | a reviewer is working on it | yes |
+| `rejected` | handed back to you | yes |
+| `applied` | accepted; live after the next `processupdates` | no |
+| `finallyrejected` | closed for good | no |
+
+You can withdraw your own submission while it is `proposed` or `reproposed`, but you can only delete a
+changeset that is still `unproposed`. Proposing requires the changeset to contain changes and to have no
+open problems.
+
+**Direct editing** skips all of this and writes changes immediately. It needs the `direct_edit`
+permission and has to be switched on in the editor. For a one-person deployment that is the sane mode; as
+soon as other people contribute, use changesets and review them.
+
+### Drawing geometry
+
+- Select the level first, and for anything that lives inside a space, the space as well. Areas, POIs,
+  stairs, altitude markers and the rest are all created from within their space.
+- A polygon is only finished when you click its first vertex again. Until the drawing is committed the
+  form has no geometry and the save button stays disabled.
+- Hold Ctrl while placing or dragging a vertex to snap to 15° steps — the quickest way to keep rooms
+  rectangular.
+
 ## Order of work
 
 Each phase depends on the ones before it. Skipping ahead mostly works until it doesn't — in particular,
@@ -70,7 +103,12 @@ what you trace everything against, so get the scale right once: measure a known 
 usually 0.8–1.0 m, a corridor 1.5–2.5 m) and set the bounds so the image matches reality. Every later
 object inherits this error if you get it wrong.
 
-Sources are only visible to users with the `sources_access` permission.
+The image file itself belongs in the `sources` folder of your data directory (`src/data/sources/` by
+default); restart the instance so it is picked up, then create the `Source` object for it. Sources are
+only visible to users with the `sources_access` permission.
+
+Known issue: switch direct editing on before adding or editing a source, otherwise the editor answers with
+a 500 ([c3nav#172](https://github.com/c3nav/c3nav/issues/172)).
 
 ### 3. Building, spaces, doors
 
