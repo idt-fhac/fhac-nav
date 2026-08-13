@@ -89,7 +89,7 @@ def locationgroup_changed(sender, instance, action, reverse, model, pk_set, usin
     if not reverse:
         instance.register_change(force=True)
     else:
-        if action not in 'post_clear':
+        if action == 'post_clear':
             raise NotImplementedError
         query = model.objects.filter(pk__in=pk_set)
         from c3nav.mapdata.models.geometry.space import SpaceGeometryMixin
