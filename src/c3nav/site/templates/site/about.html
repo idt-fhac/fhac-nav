@@ -4,7 +4,7 @@
 {% block content %}
 <main class="account">
     {% if not request.mobileclient and not ajax %}
-        <a href="{% url 'site.index' %}" class="float-right">&laquo; {% trans 'back to c3nav' %}</a>
+        <a href="{% url 'site.index' %}" class="float-right">&laquo; {% if branding and branding != 'c3nav' %}{% blocktrans with branding=branding %}back to {{ branding }}{% endblocktrans %}{% else %}{% trans 'back to c3nav' %}{% endif %}</a>
     {% endif %}
     <h2>{% trans 'About c3nav' %}</h2>
 
