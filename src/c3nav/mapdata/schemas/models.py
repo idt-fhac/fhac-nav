@@ -452,6 +452,33 @@ class WayTypeSchema(TitledSchema, DjangoModelSchema):
     """
     pass
 
+
+class GraphNodeSchema(WithPointGeometrySchema, WithSpaceSchema, DjangoModelSchema):
+    """
+    A node in the routing graph.
+    """
+    pass
+
+
+class GraphEdgeSchema(WithAccessRestrictionSchema, DjangoModelSchema):
+    """
+    An edge in the routing graph.
+    """
+    from_node: PositiveInt = APIField(
+        title="from node",
+        description="node this edge originates from",
+    )
+    to_node: PositiveInt = APIField(
+        title="to node",
+        description="node this edge leads to",
+    )
+    waytype: Optional[PositiveInt] = APIField(
+        default=None,
+        title="waytype",
+        description="optional waytype of this edge",
+    )
+
+
 class SourceSchema(WithAccessRestrictionSchema, DjangoModelSchema):
     """
     A source image that can be traced in the editor.
