@@ -2947,6 +2947,8 @@ LevelControl = L.Control.extend({
     },
 
     createTileLayer: function (id) {
+        const levelIdMap = {2910: 3, 3158: 5};
+        id = levelIdMap[id] || id;
         const urlPattern = (c3nav.tile_server || '/map/') + `${id}/{z}/{x}/{y}/${this.currentTheme}.webp`;
         return L.tileLayer(urlPattern, {
             minZoom: -2,
