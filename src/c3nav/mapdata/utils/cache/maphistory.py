@@ -92,7 +92,7 @@ class MapHistory(LevelGeometryIndexed):
             if update in self_update_i:
                 self.data[self_data == self_update_i[update]] = i
             if update in other_update_i:
-                other_data[other_data == other_update_i[update]] = i
+                other_data[other.data == other_update_i[update]] = i
 
         # calculate maximum
         maximum = np.maximum(self.data, other_data)
