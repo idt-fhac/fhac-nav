@@ -27,6 +27,7 @@ from c3nav.routing.schemas import BeaconMeasurementDataSchema
 
 if typing.TYPE_CHECKING:
     from c3nav.mapdata.render.theme import ThemeColorManager
+    from c3nav.routing.locator import LocatorResult
 
 
 class SpaceGeometryMixin(GeometryMixin):

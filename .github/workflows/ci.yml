@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            src/requirements/*.txt
+            src/requirements.txt
+      # rtree is pinned to 0.9.1, which ships no wheel for current CPython and
+      # is a ctypes wrapper, so libspatialindex has to be present to build it.
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libspatialindex-dev
+      - name: Install python dependencies
+        run: pip install -r src/requirements.txt -r src/requirements/dev.txt
+      - name: Django checks
+        working-directory: src
+        run: python manage.py check
+      - name: Tests
+        working-directory: src
+        run: python manage.py test
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: src/requirements/dev.txt
+      - name: Install linters
+        run: pip install -r src/requirements/dev.txt
+
+      # Blocking: syntax errors and undefined names only. These are real
+      # breakage, never style. Kept green as of this commit.
+      - name: flake8 (errors)
+        working-directory: src
+        run: flake8 --select=E9,F63,F7,F82 c3nav
+
+      # Advisory: main carries a backlog of ~450 style findings from the
+      # years CI was not running. Flip these to blocking once it is cleared.
+      - name: flake8 (style)
+        working-directory: src
+        run: flake8 c3nav
+        continue-on-error: true
+      - name: isort
+        working-directory: src
+        run: isort -c c3nav
+        continue-on-error: true
