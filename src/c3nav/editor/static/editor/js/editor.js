@@ -1989,6 +1989,9 @@ OverlayControl = L.Control.extend({
         this._pinned = !this._pinned;
         if (this._pinned) {
             this._expanded = true;
+            this._container.classList.add('leaflet-control-overlays-expanded');
+        } else if (!this._expanded) {
+            this._container.classList.remove('leaflet-control-overlays-expanded');
         }
         this._pin.classList.toggle('active', this._pinned);
         localStorage.setItem('c3nav.editor.overlays.pinned', JSON.stringify(this._pinned));

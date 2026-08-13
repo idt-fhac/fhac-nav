@@ -66,6 +66,7 @@ with suppress(ImportError):
         "http": Starlette(routes=[
             Mount(
                 path=settings.STATIC_URL,
+                # Starlette StaticFiles requires a str; pathlib.Path makes every lookup 404.
                 app=StaticFiles(directory=str(settings.STATIC_ROOT), follow_symlink=True),
                 name='static',
             ),
