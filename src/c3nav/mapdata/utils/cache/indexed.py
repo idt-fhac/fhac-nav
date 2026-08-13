@@ -64,9 +64,11 @@ class GeometryIndexed:
         }
         cls._read_metadata(f, kwargs)
 
+        # .frombuffer() on the bytes returned by .read() is always read-only, so copy it to get a
+        # writeable array – every mutating method below assigns to self.data directly.
         # noinspection PyTypeChecker
         kwargs['data'] = np.frombuffer(f.read(width * height * cls.dtype().itemsize), cls.dtype).reshape(
-            (height, width))
+            (height, width)).copy()
         return cls(**kwargs)
 
     @classmethod
@@ -179,9 +181,6 @@ class GeometryIndexed:
             bounds = self.get_geometry_bounds(key)
             self.fit_bounds(*bounds)
             cells = self.get_geometry_cells(key, bounds)
-            if not self.data.flags.writeable:
-                # on some systems the result of .frombuffer() is read-only, in which case this is needed
-                self.data = self.data.copy()
             self.data[cells] = value
             return
 
