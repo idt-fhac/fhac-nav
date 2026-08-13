@@ -35,9 +35,15 @@ it connects because there is a door, and it is only routable because there are g
 | `LabelSettings` | at which zoom a label is shown, and how big | `/editor/labelsettings/` |
 | `AccessRestriction` | hides objects from the public | `/editor/accessrestrictions/` |
 
-Rendering works by subtraction: **walls are `building − spaces − doors`**. If a space touches the building
-edge, there is no wall there. If two spaces are separated by a gap with no door in it, that gap renders as
-wall and the spaces are not connected.
+Rendering works by subtraction: **walls are `building − spaces − doors`**, and only ever inside a
+`Building` polygon. A wall is the part of the building that no space and no door covers — so a level with
+spaces but no building outline renders as floating floor patches with nothing between them, and absence of
+space *outside* the building is open ground, not wall. Columns and holes are subtracted from their space
+before this, which is why they become wall by the same rule.
+
+There is also no window entity, and none is needed: a window is neither walkable nor an obstacle, so it is
+part of the wall. A glazed opening you can walk through is a `Door`; a glass partition you have to walk
+around is an `Obstacle`.
 
 
 ## Order of work
@@ -78,8 +84,19 @@ Per level, in this order:
    coordinates coinciding exactly, and any sub-millimetre gap leaves the spaces unconnected; a small overlap
    costs nothing and is robust. A door that sits fully inside one space connects nothing at all.
 
-Corridors are not optional. A floor of rooms with no corridor space between them cannot be connected by
-doors at all, and no amount of later graph work will fix it.
+Corridors are not optional, and they are ordinary spaces — there is no separate room type. A floor of
+rooms with no corridor space between them cannot be connected by doors at all, and no amount of later
+graph work will fix it.
+
+A door is geometry, not connectivity. It opens the wall and joins the walkable surface, but the router
+never reads doors at all; two spaces become routable only when a graph edge crosses the door (phase 8).
+
+**Emergency exits are still doors** — leave them out and the map shows a wall where a door is. Decide in
+the graph instead whether anyone is sent through them: no edge for an alarmed exit, an edge with a way
+type that has `avoid_by_default` if it may be used on request, or an edge with an access restriction for
+staff-only doors. An access restriction on the *door* has no routing effect, because the router does not
+look at doors. A self-closing fire door that people walk through daily is an ordinary door with ordinary
+edges.
 
 ### 4. Levels for staircases
 
@@ -189,17 +206,31 @@ a walkable slope.
 
 Nothing routes until this exists — not searching, not "route from A to B". The graph is drawn by hand.
 
-**Where a node goes.** An edge is a straight line between two nodes, and the router walks that line
-literally, so nodes exist wherever the walking line bends or branches:
+**How many nodes.** There is an exact rule, and it comes from how a route attaches to the graph: a start
+or destination point connects to every node **within 10 m that it can see in a straight line** without
+crossing a wall, a column or an obstacle. If no node qualifies, the router falls back to the nearest node
+*ignoring walls*, and the first or last leg of the route cuts straight through a wall. So:
 
-- one in every space, always — this is the rule with no exceptions. A space with no node at all cannot be
-  reached, and the router's own fallback (a temporary node at a representative point of an unnoded area)
-  only kicks in for spaces that already have at least one node.
-- at every junction and at every doorway
-- along corridors, often enough that the straight line between consecutive nodes stays inside the walkable
-  area — a node every few metres in a straight run, one at each bend
-- at the foot and the head of every staircase, and in every lift car
-- a small room needs exactly one; a lecture hall with two doors needs one per door plus one in the middle
+> every point where a route can begin or end needs a node within 10 m of it and in line of sight.
+
+Line of sight binds more often than distance does — a 6 m L-shaped room needs two nodes, a 9 m empty room
+needs one. From that rule:
+
+| Room | Nodes |
+| --- | --- |
+| office, up to 10 m, convex | one, centred |
+| room or corridor longer than 10 m | one every 10–15 m, one at each bend |
+| L-shaped or split by a partition | at least one per visible part |
+| lecture hall with two doors | one per door, one in the middle |
+| room split by a stair | at least one per altitude area |
+
+**Where else a node goes.** At every junction and doorway, at the foot and the head of every staircase, and
+in every lift car.
+
+**One in every space, always.** A space with no nodes at all is unreachable — `nodes_for_point` finds
+nothing and the location raises `LocationUnreachable`. The router's fallback does not save you here: it
+places a temporary node only in an *altitude area* that has none, and only when the surrounding space
+already has a node somewhere else.
 
 Nodes must sit inside the walkable area. One outside any altitude area still works but is logged as a
 warning during `processupdates` and gets an approximated height — check that log after your first pass.
@@ -207,6 +238,11 @@ warning during `processupdates` and gets an approximated height — check that l
 **Where an edge goes.** Connect consecutive nodes so that the straight segment between them does not cross
 a wall, a column or an obstacle. This is exactly the test the router applies to its own fallback edges, and
 it is the one mistake that produces routes walking diagonally through walls.
+
+The number of edges follows from the nodes — *n* nodes along a path make *n*−1 edges, plus one per door
+crossing. Resist adding diagonal shortcuts for accuracy: the route already measures the real distance from
+the destination to its entry node, so a sparse but correct graph gives good distances, and a dense one is
+mostly something to maintain.
 
 - **Inside a space**: `/editor/spaces/<id>/graph/` lets you click to place `GraphNode`s, then connect them
   by selecting one and clicking the next.
