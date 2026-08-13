@@ -64,6 +64,52 @@ class ReadOnlyArrayTests(SimpleTestCase):
                                        [0, 0, 0, 0]])
 
 
+class CompositeReindexingTests(SimpleTestCase):
+    """
+    composite() renumbers both sides onto the merged update list. The renumbering has to read the
+    original indices, not the ones it is in the middle of writing, or updates cascade into each
+    other and collapse.
+    """
+
+    def test_distinct_updates_in_other_stay_distinct(self):
+        history = make_history([UPDATE_A], [[0, 0, 0, 0]] * 4)
+        other = make_history([UPDATE_B, UPDATE_C],
+                             [[0, 0, 1, 1]] * 4)
+
+        history.composite(other, None)
+
+        # UPDATE_B used to be swallowed by UPDATE_C: index 0 was rewritten to 1 first, and the
+        # next iteration then rewrote every 1 - including the ones it had just written - to 2
+        self.assertIn(UPDATE_B, history.updates)
+        self.assertIn(UPDATE_C, history.updates)
+
+    def test_each_cell_keeps_its_own_update(self):
+        history = make_history([UPDATE_A], [[0, 0, 0, 0]] * 4)
+        other = make_history([UPDATE_B, UPDATE_C],
+                             [[0, 0, 1, 1]] * 4)
+
+        history.composite(other, None)
+
+        cell_updates = [[history.updates[cell] for cell in row] for row in history.data.tolist()]
+        self.assertEqual(cell_updates, [[UPDATE_B, UPDATE_B, UPDATE_C, UPDATE_C]] * 4)
+
+    def test_composite_takes_the_newer_update_per_cell(self):
+        history = make_history([UPDATE_A, UPDATE_C], [[0, 0, 1, 1]] * 4)
+        other = make_history([UPDATE_B], [[0, 0, 0, 0]] * 4)
+
+        history.composite(other, None)
+
+        cell_updates = [[history.updates[cell] for cell in row] for row in history.data.tolist()]
+        self.assertEqual(cell_updates, [[UPDATE_B, UPDATE_B, UPDATE_C, UPDATE_C]] * 4)
+
+    def test_compositing_different_resolutions_is_rejected(self):
+        history = make_history([UPDATE_A], [[0, 0]] * 2, resolution=1)
+        other = make_history([UPDATE_B], [[0, 0]] * 2, resolution=2)
+
+        with self.assertRaises(ValueError):
+            history.composite(other, None)
+
+
 class SimplifyTests(SimpleTestCase):
     def test_unused_updates_are_dropped_and_cells_reindexed(self):
         history = make_history([UPDATE_A, UPDATE_B, UPDATE_C],
