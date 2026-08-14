@@ -6,7 +6,8 @@ from pathlib import Path
 
 from django.apps import apps
 from django.core.management.base import BaseCommand, CommandError
-from django.db import models, transaction
+from django.core.management.color import no_style
+from django.db import connection, models, transaction
 from shapely.geometry import shape
 
 from c3nav.mapdata.exchange.manifest import FORMAT_VERSION, ExportManifest, build_default_file_entries
@@ -160,6 +161,18 @@ class Command(BaseCommand):
                         for obj, m2m_data in m2m_pending:
                             for field_name, new_ids in m2m_data.items():
                                 getattr(obj, field_name).set(new_ids)
+
+                    # A --clear delete doesn't necessarily remove every row sharing a multi-table-
+                    # inheritance base table (e.g. LocationSlug subtypes not covered by
+                    # build_default_file_entries()), which can leave that shared table's sequence
+                    # behind the true max id left in it. Reset every mapdata model's sequence (covers
+                    # base tables like LocationSlug too, which MTI children don't have one of their
+                    # own for) so post-import object creation in the editor never collides with a
+                    # stale sequence value.
+                    all_mapdata_models = list(apps.get_app_config('mapdata').get_models())
+                    with connection.cursor() as cursor:
+                        for sql in connection.ops.sequence_reset_sql(no_style(), all_mapdata_models):
+                            cursor.execute(sql)
 
                     if options['dry_run']:
                         self.stdout.write("Dry run, rolling back transaction...")
