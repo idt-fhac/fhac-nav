@@ -1,0 +1,176 @@
+# Local all-in-one c3nav stack: core + tileserver + their dependencies.
+#
+#   podman compose up -d      (or: docker compose up -d)
+#
+#   core        http://localhost:8100/
+#   tileserver  http://localhost:8101/health/ready
+#
+# This is meant for running the fhac images locally. For a real deployment see
+# deployment/docker/compose.yaml, which puts traefik in front and expects
+# externally managed volumes.
+#
+# NOTE: the tileserver stays unhealthy until the core has processed a map
+# update and written a cache package -- on an empty database there is nothing
+# to serve and it will log "Cache package download failed: 404" on a loop.
+# Import data and then run:
+#
+#   podman compose exec c3nav-core entrypoint manage processupdates
+name: c3nav-local
+
+x-restart-policy: &restart-policy
+  restart: unless-stopped
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 10s
+  timeout: 2s
+  retries: 5
+  start_period: 5s
+
+# Shared by the core and the worker: same image, same settings, different command.
+#
+# The images are named after the packages CI publishes, but they are also built
+# from this checkout, so the stack runs without registry access:
+#
+#   podman compose build          builds both images under those names
+#   podman compose pull           uses CI's, once the packages are readable
+x-c3nav-common: &c3nav-common
+  image: ghcr.io/idt-fhac/fhac-nav:${C3NAV_TAG:-fhac}
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  volumes:
+    - c3nav-data:/data
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    memcached:
+      condition: service_started
+
+x-c3nav-environment: &c3nav-environment
+  C3NAV_DEBUG: "false"
+  C3NAV_LOGLEVEL: info
+  C3NAV_DATA_DIR: /data
+  C3NAV_DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,c3nav-core
+  UWSGI_WORKERS: ${C3NAV_CORE_WORKERS:-2}
+
+  # Kept literal on purpose. podman-compose 1.3 silently skips substitution when
+  # the variable name equals the key name, so "C3NAV_DATABASE_USER:
+  # ${C3NAV_DATABASE_USER:-postgres}" reaches the container verbatim, the user
+  # ends up unset, and psycopg2 falls back to the container's OS user (c3nav),
+  # which is not a postgres role. Only ever reference differently named
+  # variables here.
+  C3NAV_DATABASE_BACKEND: postgresql
+  C3NAV_DATABASE_NAME: c3nav
+  C3NAV_DATABASE_USER: postgres
+  C3NAV_DATABASE_HOST: postgres
+
+  C3NAV_REDIS: redis://redis:6379/0
+  C3NAV_CELERY_BROKER: redis://redis:6379/1
+  C3NAV_CELERY_BACKEND: redis://redis:6379/2
+  C3NAV_MEMCACHED: memcached:11211
+
+  # Both halves must agree on this. The core would otherwise generate a random
+  # one into /data/.tile_secret, which the tileserver container cannot read.
+  # Local-only value -- change it for anything reachable off this machine.
+  C3NAV_TILE_SECRET: local-development-tile-secret
+
+  # Handed to the browser as the tile base URL, so it has to be resolvable from
+  # the host rather than from inside the compose network. Trailing slash matters:
+  # c3nav.js appends "<level>/{z}/{x}/{y}/<theme>.webp" directly to it.
+  C3NAV_TILE_CACHE_SERVER: http://localhost:${C3NAV_TILESERVER_PORT:-8101}/
+
+services:
+  c3nav-core:
+    <<: [*restart-policy, *c3nav-common]
+    command: webstatic
+    environment:
+      <<: *c3nav-environment
+      C3NAV_AUTOMIGRATE: "yes"
+    ports:
+      - "${C3NAV_CORE_PORT:-8100}:8000"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: curl -f http://localhost:8000/ || exit 1
+      start_period: 30s
+
+  # Without this nothing ever processes map updates, so no cache package is
+  # produced and the tileserver has nothing to fetch.
+  c3nav-worker:
+    <<: [*restart-policy, *c3nav-common]
+    command: worker
+    environment:
+      <<: *c3nav-environment
+      C3NAV_AUTOMIGRATE: "no"
+    healthcheck:
+      interval: 30s
+      timeout: 15s
+      retries: 2
+      start_period: 20s
+      test: entrypoint worker_healthcheck
+
+  c3nav-tileserver:
+    <<: *restart-policy
+    image: ghcr.io/idt-fhac/fhac-nav-tileserver:${C3NAV_TAG:-fhac}
+    build:
+      context: .
+      dockerfile: docker/tileserver.dockerfile
+    depends_on:
+      c3nav-core:
+        condition: service_healthy
+      memcached:
+        condition: service_started
+    environment:
+      C3NAV_LOGLEVEL: info
+      C3NAV_DATA_DIR: /data
+      # Resolved inside the compose network; the tileserver appends
+      # "/map/cache/package.tar.zst" to it.
+      C3NAV_UPSTREAM_BASE: http://c3nav-core:8000
+      C3NAV_TILE_SECRET: local-development-tile-secret
+      # Note the name: the tileserver reads C3NAV_MEMCACHED_SERVER, while the
+      # core reads C3NAV_MEMCACHED. They are not the same variable.
+      C3NAV_MEMCACHED_SERVER: memcached
+      C3NAV_RELOAD_INTERVAL: "60"
+      UWSGI_WORKERS: ${C3NAV_TILESERVER_WORKERS:-2}
+    volumes:
+      - c3nav-tileserver-data:/data
+    ports:
+      - "${C3NAV_TILESERVER_PORT:-8101}:8000"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: curl -f http://localhost:8000/health/ready || exit 1
+      start_period: 30s
+
+  postgres:
+    <<: *restart-policy
+    image: docker.io/library/postgres:16
+    environment:
+      POSTGRES_DB: c3nav
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - c3nav-postgres:/var/lib/postgresql/data
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: pg_isready -U postgres
+
+  redis:
+    <<: *restart-policy
+    image: docker.io/library/redis:7.2
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - c3nav-redis:/data
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: redis-cli ping
+
+  memcached:
+    <<: *restart-policy
+    image: docker.io/library/memcached:1.6-alpine
+    command: memcached -m 256
+
+volumes:
+  c3nav-data:
+  c3nav-tileserver-data:
+  c3nav-postgres:
+  c3nav-redis:

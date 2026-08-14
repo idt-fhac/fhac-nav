@@ -65,7 +65,7 @@ RUN groupadd -r -g 500 c3nav && useradd -r -u 500 -g 500 -G www-data c3nav
 RUN mkdir /data && chown -R c3nav:c3nav /data
 VOLUME /data
 
-COPY --link --chown=500:500 /src /app
+COPY --chown=500:500 /src /app
 COPY --from=builder --chown=500:500 /app/env /app/env
 
 ENV C3NAV_DEBUG="" \
