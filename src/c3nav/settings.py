@@ -307,6 +307,13 @@ if HAS_MEMCACHED:
         'OPTIONS': {
             'username': config.get('memcached', 'username', fallback=None),
             'password': config.get('memcached', 'password', fallback=None),
+            # Must be a dict, not None. pylibmc defaults it to None and hands that
+            # straight to its C constructor, which probes all 30 behavior names with
+            # PyMapping_HasKeyString(None, name); subscripting None raises a TypeError
+            # each time. Python 3.13 started reporting those suppressed exceptions, so
+            # every client construction printed 31 "Exception ignored in
+            # PyMapping_HasKeyString" tracebacks. Same behaviors the tileserver uses.
+            'behaviors': {'tcp_nodelay': True, 'ketama': True},
         }
     }
     SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
