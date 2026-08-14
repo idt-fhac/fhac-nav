@@ -32,6 +32,8 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt_$TARGETARCH --mount=type=tmp
     # renovate: srcname=librsvg
     librsvg2-2=2.61.3+dfsg-3 \
     # renovate: srcname=librsvg
+    librsvg2-bin=2.61.3+dfsg-3 \
+    # renovate: srcname=librsvg
     gir1.2-rsvg-2.0=2.61.3+dfsg-3 \
     # renovate: srcname=cairo
     libcairo2=1.18.4-3 \
