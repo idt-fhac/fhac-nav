@@ -1,14 +1,16 @@
 from contextlib import contextmanager
 from functools import wraps
 
+from django.contrib import messages
 from django.contrib.messages import get_messages
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseNotModified, HttpResponseRedirect
 from django.shortcuts import render
 from django.utils.cache import patch_vary_headers
-from django.utils.translation import get_language
+from django.utils.translation import get_language, gettext_lazy as _
 
 from c3nav.editor.models import ChangeSet
+from c3nav.editor.operations import OperationApplyConflict
 from c3nav.editor.overlay import DatabaseOverlayManager
 from c3nav.mapdata.models import MapUpdate
 from c3nav.mapdata.models.access import AccessPermission
@@ -83,8 +85,21 @@ def accesses_mapdata(func):
                         raise ValueError  # todo: good error message, but this shouldn't happen
         else:
             # For non-direct editing, we will interact with the changeset
-            with within_changeset(changeset=request.changeset, user=request.user) as locked_changeset:
-                request.changeset = locked_changeset
+            try:
+                with within_changeset(changeset=request.changeset, user=request.user) as locked_changeset:
+                    request.changeset = locked_changeset
+                    return func(request, *args, **kwargs)
+            except OperationApplyConflict:
+                # The changeset's queued operations conflict with the current database
+                # state (most commonly: something it wants to create already exists) and
+                # can no longer be replayed to preview it. Falling through to render the
+                # page against the real database instead of a 500 -- without this, a
+                # single stale/conflicting changeset would 500 *every* page for its owner,
+                # including the changeset list/discard pages, with no way to recover
+                # short of deleting it directly in the database.
+                messages.error(request, _('Your active changeset could not be applied because it conflicts '
+                                          'with the current map data. It is shown below without a preview of '
+                                          'its pending changes -- you may need to edit or discard it.'))
                 return func(request, *args, **kwargs)
         return result
 

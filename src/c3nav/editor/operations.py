@@ -5,6 +5,7 @@ from typing import Annotated, Literal, Union, TypeAlias, Any, Self, Iterator
 
 from django.apps import apps
 from django.core import serializers
+from django.db import IntegrityError, transaction
 from django.db.models import Model
 from pydantic import ConfigDict
 from pydantic.types import Discriminator
@@ -18,6 +19,23 @@ ObjectID: TypeAlias = int
 FieldName: TypeAlias = str
 
 FieldValuesDict: TypeAlias = dict[FieldName, Any]
+
+
+class OperationApplyConflict(Exception):
+    """
+    Raised when applying a queued operation (e.g. a changeset's pending changes, replayed
+    for preview on every page load) hits a database conflict -- most commonly a unique
+    constraint, e.g. a GraphEdge the operation wants to create already exists because the
+    database has since changed underneath the changeset. Callers that replay operations
+    just to preview them (see `within_changeset`) should catch this and fall back to
+    rendering without the overlay rather than letting a raw IntegrityError 500 the page --
+    otherwise a single stale/conflicting changeset permanently locks its owner out of the
+    entire editor, with no self-service way to even discard it.
+    """
+    def __init__(self, operation, original: Exception):
+        self.operation = operation
+        self.original = original
+        super().__init__(f'Could not apply {operation!r}: {original}')
 
 
 class ObjectReference(BaseSchema):
@@ -249,11 +267,17 @@ class PrefetchedDatabaseOperationCollection:
     instances: dict[ObjectReference, Model]
 
     def apply(self):
-        # todo: what if unique constraint error occurs?
         prev = self.operations.prev.model_copy(deep=True)
         for operation in self.operations:
             if isinstance(operation, (CreateObjectOperation, CreateMultipleObjectsOperation)):
-                self.instances.update(operation.apply_create())
+                try:
+                    # nested atomic() so a conflict here only rolls back this savepoint,
+                    # not the whole (potentially much larger) enclosing transaction
+                    with transaction.atomic():
+                        created = operation.apply_create()
+                except IntegrityError as e:
+                    raise OperationApplyConflict(operation, e) from e
+                self.instances.update(created)
                 sub_ops = operation.objects if isinstance(operation, CreateMultipleObjectsOperation) else [operation]
                 for sub_op in sub_ops:
                     prev.set(ref=sub_op.obj, values=sub_op.fields, titles=None)
@@ -271,4 +295,8 @@ class PrefetchedDatabaseOperationCollection:
                         instance = None
                 if instance is None:
                     raise ValueError('Instance to update doesn\'t exist')
-                operation.apply(values=prev_obj.values, instance=instance)
+                try:
+                    with transaction.atomic():
+                        operation.apply(values=prev_obj.values, instance=instance)
+                except IntegrityError as e:
+                    raise OperationApplyConflict(operation, e) from e
