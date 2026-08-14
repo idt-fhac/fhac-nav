@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.contrib.auth.views import redirect_to_login
 from django.core.cache import cache
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied
-from django.db import IntegrityError, models
+from django.db import IntegrityError, models, transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -684,13 +684,28 @@ def connect_nodes(request, active_node, clicked_node, edge_settings_form):
                 (not existing or existing.pk not in request.changeset.changes.objects.get('graphedge', {}))):
             messages.error(request, _('Could not edit edge because your changeset is full.'))
             return
+
         if existing is None:
             instance.pk = None
             instance.from_node = from_node
             instance.to_node = to_node
-            instance.save()
-            messages.success(request, _('Reverse edge created.') if is_reverse else _('Edge created.'))
-        elif existing.waytype == instance.waytype and existing.access_restriction == instance.access_restriction:
+            try:
+                # nested atomic() so a collision here only rolls back this savepoint,
+                # not the whole request's outer transaction (see accesses_mapdata)
+                with transaction.atomic():
+                    instance.save()
+            except IntegrityError:
+                # a concurrent request for the same pair of nodes (e.g. a fast double
+                # click, or clicking the same two nodes again before the page state
+                # had updated) already created this edge between our check above and
+                # our insert -- re-fetch it and fall through to the same
+                # update-or-delete handling below instead of crashing with a 500.
+                existing = from_node.edges_from_here.filter(to_node=to_node).first()
+            else:
+                messages.success(request, _('Reverse edge created.') if is_reverse else _('Edge created.'))
+                continue
+
+        if existing.waytype == instance.waytype and existing.access_restriction == instance.access_restriction:
             existing.delete()
             messages.success(request, _('Reverse edge deleted.') if is_reverse else _('Edge deleted.'))
         else:
