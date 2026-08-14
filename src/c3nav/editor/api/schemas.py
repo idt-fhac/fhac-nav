@@ -56,7 +56,7 @@ class EditorGeometriesPropertiesSchema(BaseSchema):
     space: Union[
         Annotated[EditorID, APIField(title="level")],
         Annotated[None, APIField(title="null")]
-    ] = APIField(None, title="lolala")
+    ] = None
     level: Optional[EditorID] = None
     bounds: bool = False
     color: Union[

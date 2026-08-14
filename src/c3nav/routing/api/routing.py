@@ -67,20 +67,20 @@ class AltitudeWayTypeChoice(StrEnum):
 
 class UpdateRouteOptionsSchema(BaseSchema):
     # todo: default is wrong, this should be optional
-    mode: Union[
-        Annotated[RouteMode, APIField(title="route mode", description="routing mode to use")],
-        Annotated[None, APIField(title="null", description="don't change routing mode")],
-    ] = APIField(
-        default=None,
-        title="routing mode",
-    )
-    walk_speed: Union[
-        Annotated[WalkSpeed, APIField(title="walk speed", description="walk speed to use")],
-        Annotated[None, APIField(title="null", description="don't change walk speed")],
-    ] = APIField(
-        default=None,
-        title="walk speed",
-    )
+    mode: Annotated[
+        Union[
+            Annotated[RouteMode, APIField(title="route mode", description="routing mode to use")],
+            Annotated[None, APIField(title="null", description="don't change routing mode")],
+        ],
+        APIField(title="routing mode"),
+    ] = None
+    walk_speed: Annotated[
+        Union[
+            Annotated[WalkSpeed, APIField(title="walk speed", description="walk speed to use")],
+            Annotated[None, APIField(title="null", description="don't change walk speed")],
+        ],
+        APIField(title="walk speed"),
+    ] = None
     restrictions: Union[
         Annotated[RestrictedAreas, APIField(title="restricted areas",
                                             description="whether to route through restricted areas")],

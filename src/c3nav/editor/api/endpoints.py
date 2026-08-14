@@ -64,7 +64,7 @@ def geometrystyles(request):
                        openapi_extra={"security": [{"APIKeyAuth": ["editor_access"]}]})
 @api_etag_with_update_cache_key(etag_func=editor_etag_func)
 @accesses_mapdata
-def space_geometries(request, space_id: EditorID, update_cache_key: UpdateCacheKey = None, **kwargs):
+def space_geometries(request, space_id: EditorID, update_cache_key: UpdateCacheKey, **kwargs):
     # newapi_etag_with_update_cache_key does the following, don't let it confuse you:
     # - update_cache_key becomes the actual update_cache_key, not the one supplied be the user
     # - kwargs has "update_cache_key_match", which is true if update_cache_key matches the one supplied be the user
@@ -84,7 +84,7 @@ def space_geometries(request, space_id: EditorID, update_cache_key: UpdateCacheK
                        openapi_extra={"security": [{"APIKeyAuth": ["editor_access"]}]})
 @api_etag_with_update_cache_key(etag_func=editor_etag_func)
 @accesses_mapdata
-def level_geometries(request, level_id: EditorID, update_cache_key: UpdateCacheKey = None, **kwargs):
+def level_geometries(request, level_id: EditorID, update_cache_key: UpdateCacheKey, **kwargs):
     # newapi_etag_with_update_cache_key does the following, don't let it confuse you:
     # - update_cache_key becomes the actual update_cache_key, not the one supplied be the user
     # - kwargs has "update_cache_key_match", which is true if update_cache_key matches the one supplied be the user
