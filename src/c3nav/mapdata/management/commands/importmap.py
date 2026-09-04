@@ -21,9 +21,19 @@ def update_id_remap(id_remap, model_class, old_id, new_id):
             id_remap[base._meta.label][old_id] = new_id
 
 
-def deserialize_and_create(model_class, data_dict, id_remap):
+def deserialize_and_create(model_class, data_dict, id_remap, command=None):
     m2m_data = {}
     init_data = {}
+
+    # The model's own primary key must always be assigned by the database, never taken from
+    # import data. For plain models that's just 'id', but c3nav's LocationSlug subclasses
+    # (Space, Level, Area, POI, LocationGroup, ...) use multi-table inheritance, so their real
+    # pk is the parent link field (e.g. 'locationslug_ptr'), which is a OneToOneField and would
+    # otherwise be caught by the ForeignKey branch below and have its value copied straight into
+    # init_data - i.e. the new row's own primary key set from export data. Checking against
+    # _meta.pk.name (and, belt-and-braces, membership in _meta.parents.values()) catches that
+    # field regardless of its name.
+    pk_field_names = {model_class._meta.pk.name} | {f.name for f in model_class._meta.parents.values()}
 
     for field in model_class._meta.get_fields():
         if field.auto_created and not field.concrete and not isinstance(field, models.ManyToManyField):
@@ -33,6 +43,23 @@ def deserialize_and_create(model_class, data_dict, id_remap):
             continue
 
         val = data_dict[field.name]
+
+        if field.name in pk_field_names:
+            # Don't trust the incoming primary key/parent link - but if it disagrees with the
+            # record's declared 'id', the export is corrupt: importing it anyway would silently
+            # save this record over whatever unrelated row that parent-link value belongs to
+            # (Django's _save_table() sees an existing pk and UPDATEs instead of INSERTs). Warn
+            # loudly instead of importing it quietly.
+            incoming_id = data_dict.get('id')
+            if val is not None and incoming_id is not None and val != incoming_id:
+                message = (f"Record {model_class._meta.label} id={incoming_id} has a conflicting "
+                           f"{field.name}={val} - this export is corrupt, discarding that value "
+                           f"instead of letting it overwrite an unrelated existing row.")
+                if command is not None:
+                    command.stdout.write(command.style.WARNING(message))
+                else:
+                    print(f"WARNING: {message}")
+            continue
 
         if isinstance(field, models.ForeignKey):
             if val is not None:
@@ -51,8 +78,7 @@ def deserialize_and_create(model_class, data_dict, id_remap):
         elif field.__class__.__name__ == 'I18nField':
             init_data[field.attname] = val
         else:
-            if field.name != 'id':
-                init_data[field.name] = val
+            init_data[field.name] = val
 
     obj = model_class(**init_data)
     return obj, m2m_data
@@ -151,7 +177,7 @@ class Command(BaseCommand):
 
                         for record in records:
                             old_id = record['id']
-                            obj, m2m_data = deserialize_and_create(model_class, record, id_remap)
+                            obj, m2m_data = deserialize_and_create(model_class, record, id_remap, command=self)
                             obj.save()
                             update_id_remap(id_remap, model_class, old_id, obj.id)
 
