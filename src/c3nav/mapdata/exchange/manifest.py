@@ -271,6 +271,10 @@ DEFAULT_EXPORT_FILES: list[tuple[str, str, ExportSection, list[str]]] = [
     ("labelsettings.json",           "mapdata.LabelSettings",           ExportSection.LOCATIONS, []),
     ("locationgroupcategories.json", "mapdata.LocationGroupCategory",   ExportSection.LOCATIONS, []),
     ("accessrestrictions.json",      "mapdata.AccessRestriction",       ExportSection.ACCESS,    []),
+    # GroundAltitude has no dependencies of its own and must be created before the
+    # AltitudeMarkers that point at it; without it in this table importmap cannot build the
+    # FK target and altitude markers cannot round-trip at all.
+    ("groundaltitudes.json",         "mapdata.GroundAltitude",          ExportSection.GEOMETRY,  []),
 
     # --- Top-level containers ---
     ("levels.json",              "mapdata.Level",                   ExportSection.GEOMETRY,  []),
@@ -297,7 +301,8 @@ DEFAULT_EXPORT_FILES: list[tuple[str, str, ExportSection, list[str]]] = [
     ("lineobstacles.json",       "mapdata.LineObstacle",            ExportSection.GEOMETRY,  ["mapdata.Space"]),
     ("columns.json",             "mapdata.Column",                  ExportSection.GEOMETRY,  ["mapdata.Space"]),
     ("pois.json",                "mapdata.POI",                     ExportSection.GEOMETRY,  ["mapdata.Space"]),
-    ("altitudemarkers.json",     "mapdata.AltitudeMarker",          ExportSection.GEOMETRY,  ["mapdata.Space"]),
+    ("altitudemarkers.json",     "mapdata.AltitudeMarker",          ExportSection.GEOMETRY,
+     ["mapdata.Space", "mapdata.GroundAltitude"]),
 
     # --- Graph ---
     ("graphnodes.json",          "mapdata.GraphNode",               ExportSection.GRAPH,     ["mapdata.Space"]),
