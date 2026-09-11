@@ -15,61 +15,40 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,id=apt_$TARGETARCH --mount=type=tmpfs,target=/var/lib/apt/lists \
     rm /etc/apt/apt.conf.d/docker-clean && \
     apt-get update && apt-get install -y --no-install-recommends \
-    python3.14=3.14.4-1ubuntu0.1 \
-    # renovate: srcname=python3.14
-    libpython3.14=3.14.4-1ubuntu0.1 \
-    # renovate: srcname=python3.14
-    python3.14-venv=3.14.4-1ubuntu0.1 \
-    # renovate: srcname=python-pip
-    python3-pip=25.1.1+dfsg-1ubuntu2 \
-    # renovate: srcname=postgresql-18
-    libpq5=18.4-0ubuntu0.26.04.1 \
-    # renovate: srcname=postgresql-18
-    postgresql-client-18=18.4-0ubuntu0.26.04.1 \
-    curl=8.18.0-1ubuntu2.3 \
-    # renovate: srcname=pcre2
-    libpcre2-posix3=10.46-1build1 \
-    # renovate: srcname=librsvg
-    librsvg2-2=2.61.3+dfsg-3 \
-    # renovate: srcname=librsvg
-    librsvg2-bin=2.61.3+dfsg-3 \
-    # renovate: srcname=librsvg
-    gir1.2-rsvg-2.0=2.61.3+dfsg-3 \
-    # renovate: srcname=cairo
-    libcairo2=1.18.4-3 \
-    # we can't set a version here because it's different for amd64 and arm64 ugh
+    python3.14 \
+    libpython3.14 \
+    python3.14-venv \
+    python3-pip \
+    libpq5 \
+    postgresql-client-18 \
+    curl \
+    libpcre2-posix3 \
+    librsvg2-2 \
+    librsvg2-bin \
+    gir1.2-rsvg-2.0 \
+    libcairo2 \
     libgirepository-2.0-dev \
-    # renovate: srcname=libmemcached
-    libmemcached11t64=1.1.4-1.1build5 \
+    libmemcached11t64 \
     gettext \
-    tzdata=2026c-0ubuntu0.26.04.1 \
-    ca-certificates=20260223 \
-    # renovate: srcname=libzstd
-    zstd=1.5.7+dfsg-3 \
-    # renovate: srcname=spatialindex
-    libspatialindex-dev=2.1.0-1build1 \
-    # renovate: srcname=libxcrypt
-    libcrypt1=1:4.5.1-1
+    tzdata \
+    ca-certificates \
+    zstd \
+    libspatialindex-dev \
+    libcrypt1
 ENV PATH="/usr/lib/postgresql/18/bin/:$PATH"
 
 
 FROM base as builder
 RUN --mount=type=cache,target=/var/cache/apt,id=apt_$TARGETARCH --mount=type=tmpfs,target=/var/lib/apt/lists \
     apt-get update && apt-get install -y --no-install-recommends \
-    build-essential=12.12ubuntu2 \
-    # renovate: srcname=python3.14
-    python3.14-dev=3.14.4-1ubuntu0.1 \
-    # renovate: srcname=pcre2
-    libpcre2-dev=10.46-1build1 \
-    # renovate: srcname=postgresql-18
-    libpq-dev=18.4-0ubuntu0.26.04.1 \
-    # renovate: srcname=cairo
-    libcairo2-dev=1.18.4-3 \
-    libgirepository1.0-dev=1.86.0-6build1 \
-    # renovate: srcname=libmemcached
-    libmemcached-dev=1.1.4-1.1build5 \
-    # renovate: srcname=libxcrypt
-    libcrypt-dev=1:4.5.1-1
+    build-essential \
+    python3.14-dev \
+    libpcre2-dev \
+    libpq-dev \
+    libcairo2-dev \
+    libgirepository1.0-dev \
+    libmemcached-dev \
+    libcrypt-dev
 
 
 RUN mkdir /app

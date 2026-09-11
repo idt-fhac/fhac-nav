@@ -103,6 +103,9 @@ jobs:
       # ghcr.io/<owner>/<repo>[-tileserver], so this follows whichever fork it
       # runs in and never pushes to ghcr.io/c3nav/*. metadata-action lowercases
       # the name for us. Both variants get the same tags, like docker/build.sh.
+      # The branch tag is the moving one the cluster pulls (:fhac) -- there is no
+      # per-commit sha tag, so ghcr keeps one package version per branch instead
+      # of one per push. The cost is that rolling back needs a rebuild.
       - name: Derive tags
         id: meta
         uses: docker/metadata-action@v6
@@ -111,7 +114,6 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=sha,format=long
           labels: |
             org.opencontainers.image.description=Indoor navigation for the Chaos Communication Congress and other events. - ${{ matrix.description }}
 
