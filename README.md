@@ -5,7 +5,15 @@ indoor navigation for events. See it live at [c3nav.de](https://c3nav.de/).
 **Documentation for the current state is very limited. Sorry. Please do not refer to old documentation and report bugs about it not being accurate.**
 You may take a look at the [wiki](https://github.com/c3nav/c3nav/wiki). We try to answer questions as our limited time and energy permits.
 
-There is a [manual installation guide](doc/manual.md) and a [guide to building a map](doc/mapping.md).
+Documentation in this repository:
+
+* [manual installation guide](doc/manual.md)
+* [building a map](doc/mapping.md) — levels, spaces, doors, routing graph
+* [indoor positioning](doc/positioning.md) — measurements, beacons, what the Android app is needed for
+* [features beyond the map](doc/features.md) — quests, positions, data overlays
+
+The [Android app](https://github.com/c3nav/c3nav-android) documents only what is specific to the app
+(device setup, build configuration, the JavaScript bridge); everything it does is a server feature described here.
 
 There is a [changelog](CHANGELOG.md) available with the most important changes done for every event.
 
