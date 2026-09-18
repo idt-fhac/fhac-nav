@@ -33,7 +33,14 @@ def deserialize_and_create(model_class, data_dict, id_remap, command=None):
     # init_data - i.e. the new row's own primary key set from export data. Checking against
     # _meta.pk.name (and, belt-and-braces, membership in _meta.parents.values()) catches that
     # field regardless of its name.
-    pk_field_names = {model_class._meta.pk.name} | {f.name for f in model_class._meta.parents.values()}
+    # The inherited 'id' of the multi-table base (LocationSlug.id) is a concrete field of the
+    # child too, and its value is the child's pk as well: a POI(id=4419) whose save() finds
+    # LocationSlug 4419 already there (a Space's) UPDATEs that shared row and hangs the new
+    # POI off it. So every pk name up the concrete inheritance chain is off limits.
+    pk_field_names = {f.name for f in model_class._meta.parents.values()}
+    for base in model_class.mro():
+        if issubclass(base, models.Model) and hasattr(base, '_meta') and not base._meta.abstract:
+            pk_field_names.add(base._meta.pk.name)
 
     for field in model_class._meta.get_fields():
         if field.auto_created and not field.concrete and not isinstance(field, models.ManyToManyField):
@@ -94,6 +101,41 @@ class Command(BaseCommand):
         parser.add_argument('--clear', action='store_true', help='delete existing data before import (DANGEROUS)')
         parser.add_argument('--no-input', action='store_true', help='do not prompt for confirmation')
 
+    def clear_existing(self, sections_filter):
+        entries = [entry for entry in reversed(build_default_file_entries())
+                   if not sections_filter or entry.section.value in sections_filter]
+
+        # Delete through the ORM first, in reverse dependency order, so on_delete handlers of
+        # models outside the export (Report.location is SET_NULL, control.* CASCADE) run.
+        for entry in entries:
+            apps.get_model(entry.model).objects.all().delete()
+
+        # The ORM only sees rows its joins can reach: the custom managers select_related()
+        # non-null foreign keys and multi-table inheritance joins every parent table, so a row
+        # whose parent is missing or shared with another child (what the pk-taking importmap
+        # used to produce) survives .delete() and later collides with the imported ids. Sweep
+        # the tables raw, m2m through tables before their model.
+        quote = connection.ops.quote_name
+        with connection.cursor() as cursor:
+            for entry in entries:
+                model_class = apps.get_model(entry.model)
+                for field in model_class._meta.local_many_to_many:
+                    cursor.execute(f'DELETE FROM {quote(field.remote_field.through._meta.db_table)}')
+                cursor.execute(f'DELETE FROM {quote(model_class._meta.db_table)}')
+
+            # Concrete bases that are not exported themselves (LocationSlug): drop the rows no
+            # child claims any more. Children outside the export (DynamicLocation) keep theirs.
+            exported = {apps.get_model(entry.model) for entry in entries}
+            bases = {parent for model_class in exported for parent in model_class._meta.get_parent_list()
+                     if parent not in exported}
+            for base in bases:
+                claimed = ' UNION '.join(
+                    f'SELECT {quote(child._meta.parents[base].column)} FROM {quote(child._meta.db_table)}'
+                    for child in apps.get_models() if base in child._meta.parents
+                )
+                cursor.execute(f'DELETE FROM {quote(base._meta.db_table)} '
+                               f'WHERE {quote(base._meta.pk.column)} NOT IN ({claimed})')
+
     def handle(self, *args, **options):
         input_path = Path(options['input_dir'])
         temp_dir = None
@@ -144,12 +186,7 @@ class Command(BaseCommand):
                     changed_geometries.reset()
 
                     if options['clear']:
-                        # Delete in reverse dependency order
-                        for entry in reversed(build_default_file_entries()):
-                            if sections_filter and entry.section.value not in sections_filter:
-                                continue
-                            model_class = apps.get_model(entry.model)
-                            model_class.objects.all().delete()
+                        self.clear_existing(sections_filter)
                         self.stdout.write("Existing data cleared.")
 
                     id_remap = defaultdict(dict)
