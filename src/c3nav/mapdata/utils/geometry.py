@@ -69,6 +69,9 @@ def assert_multipolygon(geometry: Polygon | MultiPolygon | GeometryCollection) -
         return []
     if isinstance(geometry, Polygon):
         return [geometry]
+    if not hasattr(geometry, 'geoms'):
+        # a line or point: what two polygons that only touch have in common
+        return []
     return [geom for geom in geometry.geoms if isinstance(geom, Polygon)]
 
 
