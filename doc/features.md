@@ -85,3 +85,17 @@ polygons, lines or points with their own colours and labels, kept separate from 
 can be drawn in the editor or pulled periodically from a URL (`pull_url`, `pull_interval`), which makes
 them the place for live or external data — occupancy, sensor readings, event schedules — rather than for
 anything that belongs in the map itself.
+
+
+## Where the map opens
+
+The level and bounds shown when the map is opened are instance settings, not map data: `initial_level`
+and `initial_bounds` in the `[c3nav]` section of `c3nav.cfg` (or `C3NAV_INITIAL_LEVEL` /
+`C3NAV_INITIAL_BOUNDS`). Without `initial_level` the lowest level is shown, which on a campus with a
+basement is the wrong one. `initial_level` takes the level's slug (`eg`) as well as its id; use the slug,
+because `importmap` gives every level a new id on each import. `exportmap` records both values in the
+manifest for reference, but `importmap` does not apply them — set them on each instance.
+
+Other words a location should be found under — "Toilette" for a group titled "WC" — are *location
+redirects* (editor → *Redirects*): a slug that opens the target location, and that the search index
+includes for it. Those are map data and travel with an export.

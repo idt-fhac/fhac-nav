@@ -36,6 +36,7 @@ from c3nav.mapdata.schemas.models import (AnyPositionStatusSchema, FullListableL
 from c3nav.mapdata.schemas.responses import LocationGeometry, WithBoundsSchema, MapSettingsSchema
 from c3nav.mapdata.utils.geometry import unwrap_geom
 from c3nav.mapdata.utils.locations import (get_location_by_id_for_request, get_location_by_slug_for_request,
+                                           initial_level_pk,
                                            searchable_locations_for_request, visible_locations_for_request)
 from c3nav.mapdata.utils.user import can_access_editor
 
@@ -55,7 +56,7 @@ def map_settings(request):
 
     return MapSettingsSchema(
         initial_bounds=initial_bounds,
-        initial_level=settings.INITIAL_LEVEL or None,
+        initial_level=initial_level_pk(),
         grid=grid if grid and not isinstance(grid, DummyGrid) else None,
         tile_server=settings.TILE_CACHE_SERVER,
     )

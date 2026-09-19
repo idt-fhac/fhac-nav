@@ -40,6 +40,7 @@ from c3nav.mapdata.models.locations import (LocationGroup, LocationRedirect, Pos
 from c3nav.mapdata.models.report import Report, ReportUpdate
 from c3nav.mapdata.schemas.models import SlimLocationSchema
 from c3nav.mapdata.utils.locations import (get_location_by_id_for_request, get_location_by_slug_for_request,
+                                           initial_level_pk,
                                            levels_by_level_index_for_request)
 from c3nav.mapdata.utils.user import can_access_editor, get_user_data
 from c3nav.mapdata.views import set_tile_access_cookie
@@ -203,7 +204,7 @@ def map_index(request, mode=None, slug=None, slug2=None, details=None, options=N
         'levels': json.dumps(tuple((level.pk, level.level_index, level.short_label) for level in levels.values()), separators=(',', ':')),
         'state': json.dumps(state, separators=(',', ':'), cls=DjangoJSONEncoder),
         'tile_cache_server': settings.TILE_CACHE_SERVER,
-        'initial_level': settings.INITIAL_LEVEL,
+        'initial_level': initial_level_pk(),
         'initial_bounds': json.dumps(initial_bounds, separators=(',', ':')) if initial_bounds else None,
         'last_site_update': json.dumps(SiteUpdate.last_update()),
         'ssids': json.dumps(settings.WIFI_SSIDS, separators=(',', ':')) if settings.WIFI_SSIDS else None,

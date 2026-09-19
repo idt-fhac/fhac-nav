@@ -196,6 +196,26 @@ def locations_by_slug_for_request(request) -> Mapping[str, LocationSlug]:
     return locations
 
 
+def initial_level_pk() -> Optional[int]:
+    """
+    The level the map opens on, from settings.INITIAL_LEVEL. It may name the level by pk or,
+    since importmap hands out fresh pks on every import, by slug.
+    """
+    value = settings.INITIAL_LEVEL
+    if not value:
+        return None
+    value = str(value).strip()
+    if value.isdigit():
+        return int(value)
+
+    cache_key = f'mapdata:levels:initial_level_pk:{value}'
+    pk = proxied_cache.get(cache_key, None)
+    if pk is None:
+        pk = Level.objects.filter(slug=value).values_list('pk', flat=True).first() or 0
+        proxied_cache.set(cache_key, pk, 1800)
+    return pk or None
+
+
 def levels_by_level_index_for_request(request) -> Mapping[str, Level]:
     cache_key = 'mapdata:levels:by_level_index:%s' % AccessPermission.cache_key_for_request(request)
     levels = proxied_cache.get(cache_key, None)
