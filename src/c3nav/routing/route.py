@@ -125,7 +125,10 @@ class Route:
                     ).replace('  ', ' ').replace(' .', '.')
                     last_primary_level = None
                 else:
-                    description = description.replace('{level_change_description}', '')
+                    # an I18nField with no text in any language resolves to None, lazily
+                    description = str(description)
+                    description = (description.replace('{level_change_description}', '')
+                                   if description != 'None' else None)
                 item.descriptions.append((icon, description))
             next_item = item
 
