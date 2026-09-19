@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from django.db import models
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
+from shapely.errors import GEOSException
 from shapely.geometry import Point
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
@@ -135,7 +136,13 @@ class GeometryMixin(SerializableMixin):
                 return new_geometry
         except AttributeError:
             return new_geometry
-        difference = new_geometry.symmetric_difference(unwrap_geom(self._orig_geometry))
+        orig_geometry = unwrap_geom(self._orig_geometry)
+        try:
+            difference = new_geometry.symmetric_difference(orig_geometry)
+        except GEOSException:
+            # an invalid polygon (self-touching ring, from the editor) makes GEOS give up;
+            # buffer(0) repairs both sides so the change can still be recorded
+            difference = new_geometry.buffer(0).symmetric_difference(orig_geometry.buffer(0))
         if self._meta.get_field('geometry').geomtype in ('polygon', 'multipolygon'):
             difference = unary_union(assert_multipolygon(difference))
         return difference
