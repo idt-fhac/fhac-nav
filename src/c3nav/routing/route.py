@@ -113,6 +113,11 @@ class Route:
                 description = item.waytype.description
                 if item.waytype.up_separate and item.edge.rise > 0:
                     description = item.waytype.description_up
+                # an I18nField with no text in any language resolves to None, lazily; the
+                # response schema wants a string, so a way type without a description is
+                # named by its title ("Treppe", "Aufzug")
+                if str(description) in ('None', ''):
+                    description = str(item.waytype.title)
                 # noinspection PyComparisonWithNone
                 if (item.waytype.level_change_description != False and last_primary_level and
                         ((item.last_item and item.level != item.last_item.level) or
@@ -125,10 +130,7 @@ class Route:
                     ).replace('  ', ' ').replace(' .', '.')
                     last_primary_level = None
                 else:
-                    # an I18nField with no text in any language resolves to None, lazily
-                    description = str(description)
-                    description = (description.replace('{level_change_description}', '')
-                                   if description != 'None' else None)
+                    description = str(description).replace('{level_change_description}', '')
                 item.descriptions.append((icon, description))
             next_item = item
 
