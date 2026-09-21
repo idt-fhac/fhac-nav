@@ -1,7 +1,8 @@
 import logging
 import operator
 import pickle
-from collections import deque, namedtuple
+import threading
+from collections import OrderedDict, deque, namedtuple
 from dataclasses import dataclass, field
 from functools import reduce
 from itertools import chain
@@ -10,7 +11,6 @@ from typing import Optional, TypeVar, Generic, Mapping, Any, Sequence, TypeAlias
 
 import numpy as np
 from django.conf import settings
-from django.core.cache import cache
 from django.utils.functional import cached_property, Promise
 from shapely import prepared
 from shapely.geometry import LineString, Point, Polygon, MultiPolygon
@@ -488,16 +488,24 @@ class Router:
         from scipy.sparse.csgraph import shortest_path
         return shortest_path
 
+    # all-pairs shortest path results, per (map update, restrictions, options).
+    # a result is two n×n matrices, ~115 MB for a few thousand nodes, so it is kept in
+    # a small in-process LRU rather than in the shared cache: writing it to redis on
+    # every new option combination OOM-killed a small redis and 500ed all routing.
+    shortest_path_cache: ClassVar[OrderedDict] = OrderedDict()
+    shortest_path_cache_size: ClassVar[int] = 4
+    shortest_path_cache_lock: ClassVar[threading.Lock] = threading.Lock()
+
     def shortest_path(self, restrictions, options):
         options_key = options.serialize_string()
         cache_key = 'router:shortest_path:%s:%s:%s' % (MapUpdate.current_processed_cache_key(),
                                                        restrictions.cache_key,
                                                        options_key)
-        result = cache.get(cache_key)
-        if result:
-            distances, predecessors = result
-            return (np.frombuffer(distances, dtype=np.float64).reshape(self.graph.shape),
-                    np.frombuffer(predecessors, dtype=np.int32).reshape(self.graph.shape))
+        with self.shortest_path_cache_lock:
+            result = self.shortest_path_cache.get(cache_key)
+            if result is not None:
+                self.shortest_path_cache.move_to_end(cache_key)
+                return result
 
         graph = self.graph.copy()
 
@@ -559,9 +567,14 @@ class Router:
         graph[tuple(restrictions.edges.transpose().tolist())] = np.inf
 
         distances, predecessors = self.shortest_path_func(graph, directed=True, return_predecessors=True)
-        cache.set(cache_key, (distances.astype(np.float64).tobytes(),
-                              predecessors.astype(np.int32).tobytes()), 600)
-        return distances, predecessors
+        # float32 is plenty for distances in metres and halves the footprint
+        result = (distances.astype(np.float32), predecessors.astype(np.int32))
+        with self.shortest_path_cache_lock:
+            self.shortest_path_cache[cache_key] = result
+            self.shortest_path_cache.move_to_end(cache_key)
+            while len(self.shortest_path_cache) > self.shortest_path_cache_size:
+                self.shortest_path_cache.popitem(last=False)
+        return result
 
     def get_restrictions(self, permissions: set[int]) -> "RouterRestrictionSet":
         return RouterRestrictionSet({
