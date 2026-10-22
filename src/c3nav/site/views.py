@@ -135,6 +135,15 @@ def map_index(request, mode=None, slug=None, slug2=None, details=None, options=N
         'nearby': True if nearby else False,
     }
 
+    default_origin = None
+    if settings.DEFAULT_ORIGIN_SLUG:
+        try:
+            default_origin = check_location(settings.DEFAULT_ORIGIN_SLUG, request)
+        except Http404:
+            default_origin = None  # not visible to this visitor (restricted) or not there any more
+        if default_origin is not None:
+            default_origin = TypeAdapter(SlimLocationSchema).validate_python(default_origin).model_dump()
+
     levels = levels_by_level_index_for_request(request)
 
     level = levels.get(pos.level, None) if pos else None
@@ -203,6 +212,8 @@ def map_index(request, mode=None, slug=None, slug2=None, details=None, options=N
         'bounds': json.dumps(Source.max_bounds(), separators=(',', ':')),
         'levels': json.dumps(tuple((level.pk, level.level_index, level.short_label) for level in levels.values()), separators=(',', ':')),
         'state': json.dumps(state, separators=(',', ':'), cls=DjangoJSONEncoder),
+        'default_origin': (json.dumps(default_origin, separators=(',', ':'), cls=DjangoJSONEncoder)
+                           if default_origin else None),
         'tile_cache_server': settings.TILE_CACHE_SERVER,
         'initial_level': initial_level_pk(),
         'initial_bounds': json.dumps(initial_bounds, separators=(',', ':')) if initial_bounds else None,

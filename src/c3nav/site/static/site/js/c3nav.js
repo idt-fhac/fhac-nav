@@ -324,6 +324,8 @@ c3nav = {
         c3nav.last_site_update = JSON.parse($main.attr('data-last-site-update'));
         c3nav.new_site_update = false;
 
+        c3nav.default_origin = $main.is('[data-default-origin]') ? JSON.parse($main.attr('data-default-origin')) : null;
+
         c3nav.ssids = $main.is('[data-ssids]') ? JSON.parse($main.attr('data-ssids')) : null;
 
         c3nav.random_location_groups = $main.is('[data-random-location-groups]') ? $main.attr('data-random-location-groups').split(',').map(id => parseInt(id)) : null;
@@ -418,7 +420,14 @@ c3nav = {
         }
 
         const destination = $('#destination-input').data('location');
-        const origin = $('#origin-input').data('location');
+        let origin = $('#origin-input').data('location');
+        if (routing && !c3nav.state.routing && !origin && destination && c3nav.default_origin
+            && destination.id !== c3nav.default_origin.id) {
+            // starting a route without a start: begin at the configured default (the foyer); the
+            // visitor can still replace it, or swap/clear it like any other start
+            origin = c3nav.default_origin;
+            c3nav._locationinput_set($('#origin-input'), origin);
+        }
         const new_state = {
             routing: routing,
             origin: origin,

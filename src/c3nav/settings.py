@@ -206,6 +206,10 @@ GRID_COLS = config.get('c3nav', 'grid_cols', fallback=None)
 
 MAIN_PREVIEW_SLUG = config.get('c3nav', 'main_preview_slug', fallback='level-0')
 
+# location (slug) that is pre-filled as the route start when someone starts a route without choosing one,
+# e.g. the foyer where the QR poster hangs; empty = no default
+DEFAULT_ORIGIN_SLUG = config.get('c3nav', 'default_origin_slug', fallback='')
+
 if len(INITIAL_BOUNDS) == 4:
     try:
         INITIAL_BOUNDS = tuple(float(i) for i in INITIAL_BOUNDS)
