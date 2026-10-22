@@ -35,6 +35,10 @@ except ImportError:
 
 logger = logging.getLogger('c3nav')
 
+# spaces in the location group with this slug are rooms nobody should cut through; see Router.rebuild
+NO_TRANSIT_GROUP = 'no-transit'
+NO_TRANSIT_FACTOR = 6
+
 
 class RouterNodeAndEdge(NamedTuple):
     node: Optional["RouterNode"]
@@ -79,6 +83,7 @@ class Router:
         pois: dict[int, RouterPoint] = {}
         groups: dict[int, RouterGroup] = {}
         restrictions: dict[int, RouterRestriction] = {}
+        no_transit_nodes: list[set[int]] = []
         nodes: deque[RouterNode] = deque()
         for level in levels_query:
             buildings_geom = unary_union(tuple(unwrap_geom(building.geometry) for building in level.buildings.all()))
@@ -122,8 +127,11 @@ class Router:
                 nodes.extend(space_nodes)
 
                 space_obj = space
+                is_no_transit = any(group.slug == NO_TRANSIT_GROUP for group in space_obj.groups.all())
                 space = RouterSpace(space)
                 space.nodes = set(node.i for node in space_nodes)
+                if is_no_transit and space.nodes:
+                    no_transit_nodes.append(space.nodes)
 
                 for area in space_obj.areas.all():
                     for group in area.groups.all():
@@ -291,6 +299,12 @@ class Router:
             if area.slow_down_factor != 1:
                 area_nodes = np.array(tuple(area.nodes), dtype=np.uint32)
                 graph[area_nodes.reshape((-1, 1)), area_nodes] *= float(area.slow_down_factor)
+
+        # walking through a room (an office, a lecture hall) is a last resort: its edges cost more, so
+        # routes stay in corridors and only enter the room that is the destination or the origin
+        for space_nodes in no_transit_nodes:
+            indices = np.array(tuple(space_nodes), dtype=np.uint32)
+            graph[indices.reshape((-1, 1)), indices] *= NO_TRANSIT_FACTOR
 
         # finalize waytype matrixes
         for waytype in waytypes:
