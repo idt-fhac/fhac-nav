@@ -513,6 +513,13 @@ c3nav = {
         c3nav.update_map_locations();
     },
     _clear_route_layers: function () {
+        c3nav._routeLevels = [];
+        $('#route-level-hint').removeClass('active');
+        if (c3nav._levelControl) {
+            for (const id in c3nav._levelControl._levelButtons) {
+                L.DomUtil.removeClass(c3nav._levelControl._levelButtons[id], 'route-next');
+            }
+        }
         c3nav._firstRouteLevel = null;
         c3nav._routeLayerBounds = {};
         for (const id in c3nav._routeLayers) {
@@ -700,6 +707,7 @@ c3nav = {
         let level_collect = [];
         let next_level_collect = [];
         let in_intermediate_level = true;
+        c3nav._routeLevels = [];
         for (let i = 0; i < result.items.length; i++) {
             const item = result.items[i];
 
@@ -737,6 +745,12 @@ c3nav = {
                         c3nav._add_line_to_route(item.level.id, next_level_collect, false, last_primary_level);
                     }
                     in_intermediate_level = false;
+                    if (c3nav._routeLevels[c3nav._routeLevels.length - 1] !== item.level.id) {
+                        if (c3nav._routeLevels.length) {
+                            $details.append(c3nav._build_route_level_switch(item.level.id));
+                        }
+                        c3nav._routeLevels.push(item.level.id);
+                    }
                     if (!first_primary_level) first_primary_level = item.level.id;
                     last_primary_level = item.level.id;
                     next_level_collect = [];
@@ -775,12 +789,71 @@ c3nav = {
         c3nav.update_map_locations();
 
         c3nav._firstRouteLevel = first_primary_level || result.origin.point[0];
+        c3nav._update_route_level_hint();
         $route.find('span').text(result.summary);
         $route.find('em').text(result.options_summary);
         $route.removeClass('loading');
         $details_wrapper.removeClass('loading');
 
         if (!nofly) c3nav.fly_to_bounds(true);
+    },
+    _level_label: function (id) {
+        const level = c3nav.levels.find(x => x[0] === id);
+        return level ? level[2] : '';
+    },
+    _route_level_text: function (kind, level_id) {
+        // the banner texts are translated in the template, with %(level)s where the floor goes
+        return $('#route-level-hint').attr('data-text-' + kind).replace('%(level)s', c3nav._level_label(level_id));
+    },
+    _show_route_level: function (id) {
+        // switch the map to a level of the route and frame the route's part on it
+        c3nav._levelControl.setLevel(id);
+        const bounds = c3nav._routeLayerBounds[id];
+        if (bounds) {
+            const target = c3nav.map._getBoundsCenterZoom(bounds, c3nav._add_map_padding({}));
+            const center = c3nav.map._limitCenter(target.center, target.zoom, c3nav.map.options.maxBounds);
+            c3nav.map.flyTo(center, target.zoom, {duration: 0.6});
+        }
+        c3nav.update_map_state(true);
+        c3nav.update_location_labels();
+        c3nav._update_loadinfo_labels();
+    },
+    _build_route_level_switch: function (level_id) {
+        // a row in the route's step list that switches the map to the floor the route continues on
+        const $row = c3nav._build_route_item('layers', '').addClass('routelevelswitch');
+        $('<button class="button-clear">').text(c3nav._route_level_text('show', level_id))
+            .on('click', function () { c3nav._show_route_level(level_id); }).appendTo($row.find('span:last'));
+        return $row;
+    },
+    _update_route_level_hint: function () {
+        // a route over several floors: say so on the map, name the floor the route continues on, and make
+        // the switch one tap. Without it the route simply ends at the stairs on the floor that is shown.
+        const $hint = $('#route-level-hint');
+        const levels = c3nav._routeLevels || [];
+        const buttons = c3nav._levelControl ? c3nav._levelControl._levelButtons : {};
+        for (const id in buttons) L.DomUtil.removeClass(buttons[id], 'route-next');
+        if (levels.length < 2 || c3nav._view !== 'route-result') {
+            $hint.removeClass('active');
+            return;
+        }
+        const current = c3nav._levelControl.currentLevel;
+        const i = levels.indexOf(current);
+        let target, text;
+        if (i === -1) {
+            target = levels[0];
+            text = $hint.attr('data-text-start');
+        } else if (i < levels.length - 1) {
+            target = levels[i + 1];
+            text = $hint.attr('data-text-continue');
+        } else {
+            target = levels[i - 1];
+            text = $hint.attr('data-text-back');
+        }
+        $hint.empty().append($('<span class="text">').text(text.replace('%(level)s', c3nav._level_label(target))))
+            .append($('<button>').text(c3nav._route_level_text('show', target) + ' ›')
+                .on('click', function () { c3nav._show_route_level(target); }))
+            .addClass('active');
+        if (buttons[target]) L.DomUtil.addClass(buttons[target], 'route-next');
     },
     _add_location_point_override: function (location, item) {
         if (location.type === 'level' || location.type === 'space' || location.type === 'area') {
@@ -3017,6 +3090,7 @@ LevelControl = L.Control.extend({
             L.DomUtil.addClass(this._levelButtons[id], 'current');
         }
         this.currentLevel = id;
+        if (c3nav._update_route_level_hint) c3nav._update_route_level_hint();
         return true;
     },
 

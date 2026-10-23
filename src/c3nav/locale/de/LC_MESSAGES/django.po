@@ -4413,6 +4413,26 @@ msgid "Select"
 msgstr "Auswählen"
 
 #: c3nav/site/templates/site/map.html
+#, python-format
+msgid "The route starts on floor %%(level)s"
+msgstr "Die Route beginnt auf Etage %%(level)s"
+
+#: c3nav/site/templates/site/map.html
+#, python-format
+msgid "The route continues on floor %%(level)s"
+msgstr "Die Route geht weiter auf Etage %%(level)s"
+
+#: c3nav/site/templates/site/map.html
+#, python-format
+msgid "The first part of the route is on floor %%(level)s"
+msgstr "Der erste Teil der Route liegt auf Etage %%(level)s"
+
+#: c3nav/site/templates/site/map.html
+#, python-format
+msgid "Show floor %%(level)s"
+msgstr "Etage %%(level)s anzeigen"
+
+#: c3nav/site/templates/site/map.html
 msgid "Nearby"
 msgstr "In der Nähe"
 

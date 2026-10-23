@@ -61,6 +61,11 @@
         </section>
         {% if not embed %}
             <section id="messages">{% include 'site/fragment_messages.html' %}</section>
+            <section id="route-level-hint"
+                     data-text-start="{% trans 'The route starts on floor %(level)s' %}"
+                     data-text-continue="{% trans 'The route continues on floor %(level)s' %}"
+                     data-text-back="{% trans 'The first part of the route is on floor %(level)s' %}"
+                     data-text-show="{% trans 'Show floor %(level)s' %}"></section>
             <section id="location-popup-buttons">
                 <div class="buttons">
                     <button class="button-clear as-location">

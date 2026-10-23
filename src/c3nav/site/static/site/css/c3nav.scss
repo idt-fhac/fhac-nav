@@ -2057,3 +2057,60 @@ blink {
         font-size: 0.9em;
     }
 }
+// route over several floors: banner on the map and a highlighted floor button
+#route-level-hint {
+    display: none;
+    position: absolute;
+    z-index: 600;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100% - 140px);
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px 6px 14px;
+    border-radius: 0;
+    background: var(--color-primary);
+    color: var(--color-header-text);
+    box-shadow: 0 2px 8px var(--color-shadow);
+    font-size: 15px;
+    line-height: 20px;
+}
+
+#route-level-hint.active {
+    display: flex;
+}
+
+#route-level-hint button {
+    flex: none;
+    margin: 0;
+    padding: 0 12px;
+    height: 30px;
+    line-height: 30px;
+    border: 0;
+    border-radius: var(--border-radius);
+    background: var(--color-initial);
+    color: var(--color-primary);
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.leaflet-control-user-location a.route-next, .c3nav-level-control a.route-next, a.route-next {
+    outline: 3px solid var(--color-primary);
+    animation: route-next-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes route-next-pulse {
+    50% { outline-offset: 3px; outline-color: transparent; }
+}
+
+.routelevelswitch button {
+    margin: 0;
+    padding: 0 12px;
+    height: 28px;
+    line-height: 28px;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--border-radius);
+    color: var(--color-primary);
+    cursor: pointer;
+}
